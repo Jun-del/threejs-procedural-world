@@ -3,6 +3,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 import { mergeBufferGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { tileToPosition } from "./js/utils.js";
+import { createNoise2D } from "https://cdn.skypack.dev/simplex-noise";
 
 const canvas = document.querySelector("canvas.webgl");
 
@@ -40,7 +41,8 @@ const camera = new THREE.PerspectiveCamera(
 	0.1,
 	1000
 );
-camera.position.set(0, 0, 50);
+camera.position.set(0, 40, 50);
+// camera.position.set(-17, 31, 33);
 scene.add(camera);
 
 /**
@@ -66,6 +68,7 @@ controls.dampingFactor = 0.05;
 
 // Environment Map
 let envMap;
+const MAX_HEIGHT = 15;
 
 /**
  * Animate
@@ -78,15 +81,23 @@ let envMap;
 		.loadAsync("./asset/envMap.hdr");
 	envMap = pmremGenerator.fromEquirectangular(envMapTexture).texture;
 
+	const noise2D = createNoise2D();
+
 	// Make Hexagon Grid
-	for (let i = 0; i < 20; i++) {
-		for (let j = 0; j < 20; j++) {
-			makeHexagon(3, tileToPosition(i, j));
+	for (let i = -15; i <= 15; i++) {
+		for (let j = -15; j <= 15; j++) {
+			let position = tileToPosition(i, j);
+
+			// Skip hexagons outside of radius (16)
+			if (position.length() > 16) continue;
+
+			let value2d = (noise2D(i * 0.1, j * 0.1) + 1) * 0.5;
+
+			makeHexagon(value2d * MAX_HEIGHT, position);
 		}
 	}
 
 	// Make Hexagon
-	makeHexagon(3, new THREE.Vector2(0, 0));
 	let hexagonMesh = new THREE.Mesh(
 		hexagonGeometries,
 		new THREE.MeshStandardMaterial({ envMap, flatShading: true })
