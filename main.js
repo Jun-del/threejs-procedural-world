@@ -4,7 +4,6 @@ import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 import { mergeBufferGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { tileToPosition } from "./js/utils.js";
 import { createNoise2D } from "https://cdn.skypack.dev/simplex-noise";
-import { MeshPhysicalMaterial } from "three";
 
 const canvas = document.querySelector("canvas.webgl");
 
@@ -52,14 +51,13 @@ scene.add(camera);
 const renderer = new THREE.WebGLRenderer({
 	canvas: canvas,
 	antialias: true,
-	toneMapping: THREE.ACESFilmicToneMapping,
-	outputEncoding: THREE.sRGBEncoding,
-	physicalCorrectLights: true,
-	shadowMap: {
-		type: THREE.PCFSoftShadowMap,
-	},
 });
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.physicallyCorrectLights = true;
 renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
 renderer.setSize(sizes.width, sizes.height);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
@@ -90,13 +88,7 @@ controls.dampingFactor = 0.05;
 // Environment Map
 let envMap;
 
-// Textures
 const MAX_HEIGHT = 10;
-const STONE_HEIGHT = MAX_HEIGHT * 0.8;
-const DIRT_HEIGHT = MAX_HEIGHT * 0.7;
-const GRASS_HEIGHT = MAX_HEIGHT * 0.5;
-const SAND_HEIGHT = MAX_HEIGHT * 0.3;
-const DIRT2_HEIGHT = MAX_HEIGHT * 0;
 
 /**
  * Animate
@@ -115,8 +107,8 @@ const DIRT2_HEIGHT = MAX_HEIGHT * 0;
 		dirt2: await new THREE.TextureLoader().loadAsync("./asset/textures/dirt2.jpg"),
 		grass: await new THREE.TextureLoader().loadAsync("./asset/textures/grass.jpg"),
 		sand: await new THREE.TextureLoader().loadAsync("./asset/textures/sand.jpg"),
-		stone: await new THREE.TextureLoader().loadAsync("./asset/textures/stone.png"),
 		water: await new THREE.TextureLoader().loadAsync("./asset/textures/water.jpg"),
+		stone: await new THREE.TextureLoader().loadAsync("./asset/textures/stone.png"),
 	};
 
 	const noise2D = createNoise2D();
@@ -152,11 +144,6 @@ const DIRT2_HEIGHT = MAX_HEIGHT * 0;
 /**
  * Create Hexagon Function
  */
-let stoneGeometry = new THREE.BoxGeometry(0, 0, 0);
-let dirtGeometry = new THREE.BoxGeometry(0, 0, 0);
-let dirt2Geometry = new THREE.BoxGeometry(0, 0, 0);
-let sandGeometry = new THREE.BoxGeometry(0, 0, 0);
-let grassGeometry = new THREE.BoxGeometry(0, 0, 0);
 
 function hexagonGeometry(height, position) {
 	const geometry = new THREE.CylinderGeometry(1, 1, height, 6, 1, false);
@@ -165,44 +152,39 @@ function hexagonGeometry(height, position) {
 	return geometry;
 }
 
+const STONE_HEIGHT = MAX_HEIGHT * 0.8;
+const DIRT_HEIGHT = MAX_HEIGHT * 0.7;
+const GRASS_HEIGHT = MAX_HEIGHT * 0.5;
+const SAND_HEIGHT = MAX_HEIGHT * 0.3;
+const DIRT2_HEIGHT = MAX_HEIGHT * 0;
+
+let stoneGeometry = new THREE.BoxGeometry(0, 0, 0);
+let dirtGeometry = new THREE.BoxGeometry(0, 0, 0);
+let dirt2Geometry = new THREE.BoxGeometry(0, 0, 0);
+let sandGeometry = new THREE.BoxGeometry(0, 0, 0);
+let grassGeometry = new THREE.BoxGeometry(0, 0, 0);
+
 // Merge hexagons into one geometry to reduce draw calls
 function makeHexagon(height, position) {
 	let geometry = hexagonGeometry(height, position);
 
 	if (height > STONE_HEIGHT) {
-		stoneGeometry = mergeBufferGeometries([stoneGeometry, geometry]);
+		stoneGeometry = mergeBufferGeometries([geometry, stoneGeometry]);
 	} else if (height > DIRT_HEIGHT) {
-		dirtGeometry = mergeBufferGeometries([dirtGeometry, geometry]);
+		dirtGeometry = mergeBufferGeometries([geometry, dirtGeometry]);
 	} else if (height > GRASS_HEIGHT) {
-		dirt2Geometry = mergeBufferGeometries([dirt2Geometry, geometry]);
+		grassGeometry = mergeBufferGeometries([geometry, grassGeometry]);
 	} else if (height > SAND_HEIGHT) {
-		sandGeometry = mergeBufferGeometries([sandGeometry, geometry]);
+		sandGeometry = mergeBufferGeometries([geometry, sandGeometry]);
 	} else if (height > DIRT2_HEIGHT) {
-		grassGeometry = mergeBufferGeometries([grassGeometry, geometry]);
+		dirt2Geometry = mergeBufferGeometries([geometry, dirt2Geometry]);
 	}
-
-	// switch (height) {
-	// 	case height > STONE_HEIGHT:
-	// 		stoneGeometry = mergeBufferGeometries([stoneGeometry, geometry]);
-	// 		break;
-	// 	case height > DIRT_HEIGHT:
-	// 		dirtGeometry = mergeBufferGeometries([dirtGeometry, geometry]);
-	// 		break;
-	// 	case height > DIRT2_HEIGHT:
-	// 		dirt2Geometry = mergeBufferGeometries([dirt2Geometry, geometry]);
-	// 		break;
-	// 	case height > SAND_HEIGHT:
-	// 		sandGeometry = mergeBufferGeometries([sandGeometry, geometry]);
-	// 		break;
-	// 	case height > GRASS_HEIGHT:
-	// 		grassGeometry = mergeBufferGeometries([grassGeometry, geometry]);
-	// 		break;
-	// }
 }
 
 function hexagonMesh(geometry, textureMap) {
-	let material = new MeshPhysicalMaterial({
+	let material = new THREE.MeshPhysicalMaterial({
 		envMap,
+		envMapIntensity: 0.135,
 		flatShading: true,
 		map: textureMap,
 	});
