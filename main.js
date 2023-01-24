@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 import { mergeBufferGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { tileToPosition } from "./js/utils.js";
+import { tileToPosition, hexagonGeometry, hexagonMesh } from "./js/utils.js";
 import { createNoise2D } from "https://cdn.skypack.dev/simplex-noise";
 
 const canvas = document.querySelector("canvas.webgl");
@@ -43,7 +43,7 @@ const camera = new THREE.PerspectiveCamera(
 );
 // camera.position.set(0, 40, 50);
 camera.position.set(-17, 31, 33);
-scene.add(camera);
+// scene.add(camera);
 
 /**
  * Renderer
@@ -65,30 +65,36 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
  * Lights
  */
 const pointLight = new THREE.PointLight(
-	new THREE.Color("#FFCB8E").convertSRGBToLinear().convertSRGBToLinear(),
+	new THREE.Color("#B3E1E9").convertSRGBToLinear().convertSRGBToLinear(),
 	80,
 	200
 );
 pointLight.position.set(10, 20, 10);
+
 pointLight.castShadow = true;
 pointLight.shadow.mapSize.width = 512;
 pointLight.shadow.mapSize.height = 512;
 pointLight.shadow.camera.near = 0.5;
-pointLight.shadow.camera.far = 500;
+pointLight.shadow.camera.far = 20;
 scene.add(pointLight);
+
+const pointLightCameraHelper = new THREE.CameraHelper(pointLight.shadow.camera);
+scene.add(pointLightCameraHelper);
+pointLightCameraHelper.visible = false;
 
 /**
  * Controls
  */
 const controls = new OrbitControls(camera, canvas);
 controls.target.set(0, 0, 0);
-controls.enableDamping = true;
 controls.dampingFactor = 0.05;
+controls.enableDamping = true;
 
 // Environment Map
 let envMap;
 
 const MAX_HEIGHT = 10;
+const textureLoader = new THREE.TextureLoader();
 
 /**
  * Animate
@@ -103,12 +109,12 @@ const MAX_HEIGHT = 10;
 
 	// Load Textures
 	const textures = {
-		dirt: await new THREE.TextureLoader().loadAsync("./asset/textures/dirt.png"),
-		dirt2: await new THREE.TextureLoader().loadAsync("./asset/textures/dirt2.jpg"),
-		grass: await new THREE.TextureLoader().loadAsync("./asset/textures/grass.jpg"),
-		sand: await new THREE.TextureLoader().loadAsync("./asset/textures/sand.jpg"),
-		water: await new THREE.TextureLoader().loadAsync("./asset/textures/water.jpg"),
-		stone: await new THREE.TextureLoader().loadAsync("./asset/textures/stone.png"),
+		dirt: await textureLoader.loadAsync("./asset/textures/dirt.png"),
+		dirt2: await textureLoader.loadAsync("./asset/textures/dirt2.jpg"),
+		grass: await textureLoader.loadAsync("./asset/textures/grass.jpg"),
+		sand: await textureLoader.loadAsync("./asset/textures/sand.jpg"),
+		water: await textureLoader.loadAsync("./asset/textures/water.jpg"),
+		stone: await textureLoader.loadAsync("./asset/textures/stone.png"),
 	};
 
 	const noise2D = createNoise2D();
@@ -127,11 +133,13 @@ const MAX_HEIGHT = 10;
 		}
 	}
 
-	const stoneMesh = hexagonMesh(stoneGeometry, textures.stone);
-	const dirtMesh = hexagonMesh(dirtGeometry, textures.dirt);
-	const dirt2Mesh = hexagonMesh(dirt2Geometry, textures.dirt2);
-	const sandMesh = hexagonMesh(sandGeometry, textures.sand);
-	const grassMesh = hexagonMesh(grassGeometry, textures.grass);
+	const dirtMesh = hexagonMesh(dirtGeometry, textures.dirt, envMap);
+	const dirt2Mesh = hexagonMesh(dirt2Geometry, textures.dirt2, envMap);
+	const grassMesh = hexagonMesh(grassGeometry, textures.grass, envMap);
+	const sandMesh = hexagonMesh(sandGeometry, textures.sand, envMap);
+	// Water
+	const stoneMesh = hexagonMesh(stoneGeometry, textures.stone, envMap);
+
 	scene.add(stoneMesh, dirtMesh, dirt2Mesh, sandMesh, grassMesh);
 
 	// Render Loop
@@ -145,12 +153,12 @@ const MAX_HEIGHT = 10;
  * Create Hexagon Function
  */
 
-function hexagonGeometry(height, position) {
-	const geometry = new THREE.CylinderGeometry(1, 1, height, 6, 1, false);
-	geometry.translate(position.x, height * 0.5, position.y);
+// function hexagonGeometry(height, position) {
+// 	const geometry = new THREE.CylinderGeometry(1, 1, height, 6, 1, false);
+// 	geometry.translate(position.x, height * 0.5, position.y);
 
-	return geometry;
-}
+// 	return geometry;
+// }
 
 const STONE_HEIGHT = MAX_HEIGHT * 0.8;
 const DIRT_HEIGHT = MAX_HEIGHT * 0.7;
@@ -179,19 +187,4 @@ function makeHexagon(height, position) {
 	} else if (height > DIRT2_HEIGHT) {
 		dirt2Geometry = mergeBufferGeometries([geometry, dirt2Geometry]);
 	}
-}
-
-function hexagonMesh(geometry, textureMap) {
-	let material = new THREE.MeshPhysicalMaterial({
-		envMap,
-		envMapIntensity: 0.135,
-		flatShading: true,
-		map: textureMap,
-	});
-
-	let mesh = new THREE.Mesh(geometry, material);
-	mesh.castShadow = true;
-	mesh.receiveShadow = true;
-
-	return mesh;
 }
