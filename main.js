@@ -2,7 +2,12 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 import { mergeBufferGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { tileToPosition, hexagonGeometry, hexagonMesh, colorPicker } from "./js/utils.js";
+import {
+	tileToPosition,
+	hexagonGeometry,
+	hexagonMesh,
+	colorPicker,
+} from "./src/utils.js";
 import { createNoise2D } from "https://cdn.skypack.dev/simplex-noise";
 
 const canvas = document.querySelector("canvas.webgl");
@@ -104,7 +109,7 @@ const MAX_HEIGHT = 10;
 	let pmremGenerator = new THREE.PMREMGenerator(renderer);
 	let envMapTexture = await new RGBELoader()
 		.setDataType(THREE.FloatType)
-		.loadAsync("./asset/envMap.hdr");
+		.loadAsync("./asset/hdr/envmap.hdr");
 	envMap = pmremGenerator.fromEquirectangular(envMapTexture).texture;
 
 	// Load Textures
