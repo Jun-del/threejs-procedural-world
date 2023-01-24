@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 import { mergeBufferGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { tileToPosition, hexagonGeometry, hexagonMesh } from "./js/utils.js";
+import { tileToPosition, hexagonGeometry, hexagonMesh, colorPicker } from "./js/utils.js";
 import { createNoise2D } from "https://cdn.skypack.dev/simplex-noise";
 
 const canvas = document.querySelector("canvas.webgl");
@@ -64,8 +64,9 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 /**
  * Lights
  */
+const pointLightColor = colorPicker("#FFEECC");
 const pointLight = new THREE.PointLight(
-	new THREE.Color("#B3E1E9").convertSRGBToLinear().convertSRGBToLinear(),
+	pointLightColor.convertSRGBToLinear().convertSRGBToLinear(),
 	80,
 	200
 );
@@ -94,7 +95,6 @@ controls.enableDamping = true;
 let envMap;
 
 const MAX_HEIGHT = 10;
-const textureLoader = new THREE.TextureLoader();
 
 /**
  * Animate
@@ -108,6 +108,7 @@ const textureLoader = new THREE.TextureLoader();
 	envMap = pmremGenerator.fromEquirectangular(envMapTexture).texture;
 
 	// Load Textures
+	const textureLoader = new THREE.TextureLoader();
 	const textures = {
 		dirt: await textureLoader.loadAsync("./asset/textures/dirt.png"),
 		dirt2: await textureLoader.loadAsync("./asset/textures/dirt2.jpg"),
@@ -120,8 +121,8 @@ const textureLoader = new THREE.TextureLoader();
 	const noise2D = createNoise2D();
 
 	// Make Hexagon Grid
-	for (let i = -15; i <= 15; i++) {
-		for (let j = -15; j <= 15; j++) {
+	for (let i = -20; i <= 20; i++) {
+		for (let j = -20; j <= 20; j++) {
 			let position = tileToPosition(i, j);
 
 			// Skip hexagons outside of radius (16)
@@ -142,23 +143,60 @@ const textureLoader = new THREE.TextureLoader();
 
 	scene.add(stoneMesh, dirtMesh, dirt2Mesh, sandMesh, grassMesh);
 
+	// Sea Mesh (Water)
+	const seaMesh = new THREE.Mesh(
+		new THREE.CylinderGeometry(17, 17, MAX_HEIGHT * 0.2, 50),
+		new THREE.MeshPhysicalMaterial({
+			envMap,
+			color: colorPicker("#55aaff").convertSRGBToLinear().multiplyScalar(3),
+			ior: 1.4,
+			transmission: 1,
+			transparent: true,
+			thickness: 1.5,
+			envMapIntensity: 0.2,
+			roughness: 1,
+			metalness: 0.025,
+			roughnessMap: textures.water,
+			metalnessMap: textures.water,
+		})
+	);
+	seaMesh.receiveShadow = true;
+	seaMesh.position.set(0, MAX_HEIGHT * 0.2 * 0.5, 0);
+	scene.add(seaMesh);
+
+	let mapContainer = new THREE.Mesh(
+		// Cylinder slightly larger and taller than seaMesh
+		new THREE.CylinderGeometry(17.1, 17.1, MAX_HEIGHT * 0.25, 50, 1, true),
+		new THREE.MeshPhysicalMaterial({
+			envMap,
+			map: textures.dirt,
+			envMapIntensity: 0.2,
+			side: THREE.DoubleSide,
+		})
+	);
+	mapContainer.receiveShadow = true;
+	mapContainer.position.set(0, MAX_HEIGHT * 0.125, 0);
+	scene.add(mapContainer);
+
+	let mapFloor = new THREE.Mesh(
+		new THREE.CylinderGeometry(18.5, 18.5, MAX_HEIGHT * 0.1, 50),
+		new THREE.MeshPhysicalMaterial({
+			envMap,
+			map: textures.dirt2,
+			envMapIntensity: 0.1,
+			side: THREE.DoubleSide,
+		})
+	);
+	mapFloor.receiveShadow = true;
+	mapFloor.position.set(0, -MAX_HEIGHT * 0.05, 0);
+	scene.add(mapFloor);
+
 	// Render Loop
 	renderer.setAnimationLoop(() => {
 		controls.update();
 		renderer.render(scene, camera);
 	});
 })();
-
-/**
- * Create Hexagon Function
- */
-
-// function hexagonGeometry(height, position) {
-// 	const geometry = new THREE.CylinderGeometry(1, 1, height, 6, 1, false);
-// 	geometry.translate(position.x, height * 0.5, position.y);
-
-// 	return geometry;
-// }
 
 const STONE_HEIGHT = MAX_HEIGHT * 0.8;
 const DIRT_HEIGHT = MAX_HEIGHT * 0.7;
