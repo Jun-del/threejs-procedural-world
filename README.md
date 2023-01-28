@@ -1,6 +1,7 @@
-# threejs-procedural-world
+# Reference: <br> 
+1. [Three.js in practice - Procedural Map](https://youtu.be/HsCYEA_UuZA)
 
-## To Do
+### To Do
 
 1. Add a skybox
 2. Add a sun and moon (with a light source) that rotates around the world
