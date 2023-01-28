@@ -7,8 +7,13 @@ import {
 	hexagonGeometry,
 	hexagonMesh,
 	colorPicker,
+	createStone,
+	createTree,
+	createCloud,
 } from "./src/utils.js";
 import { createNoise2D } from "https://cdn.skypack.dev/simplex-noise";
+
+// envmap https://polyhaven.com/a/herkulessaulen
 
 const canvas = document.querySelector("canvas.webgl");
 
@@ -40,15 +45,9 @@ window.addEventListener("resize", () => {
 /**
  * Camera
  */
-const camera = new THREE.PerspectiveCamera(
-	45,
-	window.innerWidth / window.innerHeight,
-	0.1,
-	1000
-);
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
 // camera.position.set(0, 40, 50);
 camera.position.set(-17, 31, 33);
-// scene.add(camera);
 
 /**
  * Renderer
@@ -69,24 +68,24 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 /**
  * Lights
  */
-const pointLightColor = colorPicker("#FFEECC");
+const pointLightColor = colorPicker("#FFCB8E");
 const pointLight = new THREE.PointLight(
 	pointLightColor.convertSRGBToLinear().convertSRGBToLinear(),
-	80,
+	1200,
 	200
 );
 pointLight.position.set(10, 20, 10);
-
 pointLight.castShadow = true;
 pointLight.shadow.mapSize.width = 512;
 pointLight.shadow.mapSize.height = 512;
 pointLight.shadow.camera.near = 0.5;
-pointLight.shadow.camera.far = 20;
+pointLight.shadow.camera.far = 30;
 scene.add(pointLight);
 
-const pointLightCameraHelper = new THREE.CameraHelper(pointLight.shadow.camera);
-scene.add(pointLightCameraHelper);
-pointLightCameraHelper.visible = false;
+// Light Helper
+// const pointLightCameraHelper = new THREE.CameraHelper(pointLight.shadow.camera);
+// scene.add(pointLightCameraHelper);
+// pointLightCameraHelper.visible = true;
 
 /**
  * Controls
@@ -95,6 +94,10 @@ const controls = new OrbitControls(camera, canvas);
 controls.target.set(0, 0, 0);
 controls.dampingFactor = 0.05;
 controls.enableDamping = true;
+
+// PMREMGenerator is used to generate a cube map from an equirectangular texture
+let pmremGenerator = new THREE.PMREMGenerator(renderer);
+pmremGenerator.compileEquirectangularShader();
 
 // Environment Map
 let envMap;
@@ -105,25 +108,21 @@ const MAX_HEIGHT = 10;
  * Animate
  */
 (async function () {
-	// Environment Map
-	let pmremGenerator = new THREE.PMREMGenerator(renderer);
-	let envMapTexture = await new RGBELoader()
-		.setDataType(THREE.FloatType)
-		.loadAsync("./asset/hdr/envmap.hdr");
+	let envMapTexture = await new RGBELoader().loadAsync("/envmap.hdr");
 	envMap = pmremGenerator.fromEquirectangular(envMapTexture).texture;
 
 	// Load Textures
 	const textureLoader = new THREE.TextureLoader();
 	const textures = {
-		dirt: await textureLoader.loadAsync("./asset/textures/dirt.png"),
-		dirt2: await textureLoader.loadAsync("./asset/textures/dirt2.jpg"),
-		grass: await textureLoader.loadAsync("./asset/textures/grass.jpg"),
-		sand: await textureLoader.loadAsync("./asset/textures/sand.jpg"),
-		water: await textureLoader.loadAsync("./asset/textures/water.jpg"),
-		stone: await textureLoader.loadAsync("./asset/textures/stone.png"),
+		dirt: await textureLoader.loadAsync("/dirt.png"),
+		dirt2: await textureLoader.loadAsync("/dirt2.jpg"),
+		grass: await textureLoader.loadAsync("/grass.jpg"),
+		sand: await textureLoader.loadAsync("/sand.jpg"),
+		water: await textureLoader.loadAsync("/water.jpg"),
+		stone: await textureLoader.loadAsync("/stone.png"),
 	};
 
-	const noise2D = createNoise2D();
+	const noise2D = new createNoise2D();
 
 	// Make Hexagon Grid
 	for (let i = -20; i <= 20; i++) {
@@ -134,6 +133,7 @@ const MAX_HEIGHT = 10;
 			if (position.length() > 16) continue;
 
 			let value2d = (noise2D(i * 0.1, j * 0.1) + 1) * 0.5;
+			value2d = Math.pow(value2d, 1.5);
 
 			makeHexagon(value2d * MAX_HEIGHT, position);
 		}
@@ -143,10 +143,14 @@ const MAX_HEIGHT = 10;
 	const dirt2Mesh = hexagonMesh(dirt2Geometry, textures.dirt2, envMap);
 	const grassMesh = hexagonMesh(grassGeometry, textures.grass, envMap);
 	const sandMesh = hexagonMesh(sandGeometry, textures.sand, envMap);
-	// Water
 	const stoneMesh = hexagonMesh(stoneGeometry, textures.stone, envMap);
 
 	scene.add(stoneMesh, dirtMesh, dirt2Mesh, sandMesh, grassMesh);
+
+	let waterTexture = textures.water;
+	waterTexture.repeat = new THREE.Vector2(1, 1);
+	waterTexture.wrapS = THREE.RepeatWrapping;
+	waterTexture.wrapT = THREE.RepeatWrapping;
 
 	// Sea Mesh (Water)
 	const seaMesh = new THREE.Mesh(
@@ -161,11 +165,12 @@ const MAX_HEIGHT = 10;
 			envMapIntensity: 0.2,
 			roughness: 1,
 			metalness: 0.025,
-			roughnessMap: textures.water,
-			metalnessMap: textures.water,
+			roughnessMap: waterTexture,
+			metalnessMap: waterTexture,
 		})
 	);
 	seaMesh.receiveShadow = true;
+	seaMesh.rotation.y = -Math.PI * 0.333 * 0.5;
 	seaMesh.position.set(0, MAX_HEIGHT * 0.2 * 0.5, 0);
 	scene.add(seaMesh);
 
@@ -180,6 +185,7 @@ const MAX_HEIGHT = 10;
 		})
 	);
 	mapContainer.receiveShadow = true;
+	mapContainer.rotation.y = -Math.PI * 0.333 * 0.5;
 	mapContainer.position.set(0, MAX_HEIGHT * 0.125, 0);
 	scene.add(mapContainer);
 
@@ -195,6 +201,9 @@ const MAX_HEIGHT = 10;
 	mapFloor.receiveShadow = true;
 	mapFloor.position.set(0, -MAX_HEIGHT * 0.05, 0);
 	scene.add(mapFloor);
+
+	// Clouds
+	createCloud(envMap, scene);
 
 	// Render Loop
 	renderer.setAnimationLoop(() => {
@@ -215,19 +224,35 @@ let dirt2Geometry = new THREE.BoxGeometry(0, 0, 0);
 let sandGeometry = new THREE.BoxGeometry(0, 0, 0);
 let grassGeometry = new THREE.BoxGeometry(0, 0, 0);
 
-// Merge hexagons into one geometry to reduce draw calls
 function makeHexagon(height, position) {
 	let geometry = hexagonGeometry(height, position);
+	let addStone = Math.random() > 0.8;
+	let addTree = Math.random() > 0.8;
 
-	if (height > STONE_HEIGHT) {
-		stoneGeometry = mergeBufferGeometries([geometry, stoneGeometry]);
-	} else if (height > DIRT_HEIGHT) {
-		dirtGeometry = mergeBufferGeometries([geometry, dirtGeometry]);
-	} else if (height > GRASS_HEIGHT) {
-		grassGeometry = mergeBufferGeometries([geometry, grassGeometry]);
-	} else if (height > SAND_HEIGHT) {
-		sandGeometry = mergeBufferGeometries([geometry, sandGeometry]);
-	} else if (height > DIRT2_HEIGHT) {
-		dirt2Geometry = mergeBufferGeometries([geometry, dirt2Geometry]);
+	switch (true) {
+		case height > STONE_HEIGHT:
+			stoneGeometry = mergeBufferGeometries([geometry, stoneGeometry]);
+			if (addStone) {
+				stoneGeometry = mergeBufferGeometries([stoneGeometry, createStone(height, position)]);
+			}
+			break;
+		case height > DIRT_HEIGHT:
+			dirtGeometry = mergeBufferGeometries([geometry, dirtGeometry]);
+			if (addTree) {
+				grassGeometry = mergeBufferGeometries([grassGeometry, createTree(height, position)]);
+			}
+			break;
+		case height > GRASS_HEIGHT:
+			grassGeometry = mergeBufferGeometries([geometry, grassGeometry]);
+			break;
+		case height > SAND_HEIGHT:
+			sandGeometry = mergeBufferGeometries([geometry, sandGeometry]);
+			if (addStone) {
+				stoneGeometry = mergeBufferGeometries([stoneGeometry, createStone(height, position)]);
+			}
+			break;
+		case height > DIRT2_HEIGHT:
+			dirt2Geometry = mergeBufferGeometries([geometry, dirt2Geometry]);
+			break;
 	}
 }
